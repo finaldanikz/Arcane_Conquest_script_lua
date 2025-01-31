@@ -166,95 +166,72 @@ local function toggleAutoAbility(isEnabled)
     end
 end
 
+
 -- Mob Teleport functionality
-local function findNearestNPC()
-    local nearestNPC = nil
+local function findNearestEnemy()
+    local nearestEnemy = nil
     local nearestDistance = math.huge
     
-    local Character = player.Character
-    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+    local character = game.Players.LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     
-    local dungeon = workspace:FindFirstChild("enemies")
-    if not dungeon then return end
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return end
     
-    for _, child in ipairs(dungeon:GetChildren()) do
-        if child:FindFirstChild("enemiesFolder") then
-            for _, npc in ipairs(child.enemiesFolder:GetChildren()) do
-                if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
-                    local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
-                    if distance < nearestDistance then
-                        nearestDistance = distance
-                        nearestNPC = npc
-                    end
-                end
+    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+        if enemy:FindFirstChild("HumanoidRootPart") and 
+           enemy:FindFirstChild("Humanoid") and 
+           enemy.Humanoid.Health > 0 then
+            
+            local distance = (character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+            if distance < nearestDistance then
+                nearestDistance = distance
+                nearestEnemy = enemy
             end
         end
     end
-    return nearestNPC
-end
-
-local function softLockCharacter(character, position)
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local connection
-        connection = game:GetService("RunService").Heartbeat:Connect(function()
-            if character.Parent and character:FindFirstChild("HumanoidRootPart") then
-                character.HumanoidRootPart.CFrame = position
-            else
-                connection:Disconnect()
-            end
-        end)
-        return connection
-    end
-end
-
-local softLockConnection
-local tpActive = false
-
-local function teleportToNPC()
-    if not tpActive then return end
     
-    local Character = player.Character
-    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
-    
-    local npc = findNearestNPC()
-    if npc and npc:FindFirstChild("HumanoidRootPart") then
-        local npcPosition = npc.HumanoidRootPart.Position
-        local teleportPosition = Vector3.new(npcPosition.X, npcPosition.Y + 9, npcPosition.Z)
-        
-        local lookVector = (npcPosition - teleportPosition).Unit
-        local lookCFrame = CFrame.new(teleportPosition, teleportPosition + lookVector)
-        
-        Character.HumanoidRootPart.CFrame = lookCFrame
-        
-        if softLockConnection then
-            softLockConnection:Disconnect()
-        end
-        
-        softLockConnection = softLockCharacter(Character, lookCFrame)
-    end
+    return nearestEnemy
 end
 
--- Update the toggle function to use the new teleport system
+-- Teleport functionality
+local mobTeleportActive = false
 local teleportLoop = nil
 
 local function toggleMobTeleport(isEnabled)
-    tpActive = isEnabled
+    mobTeleportActive = isEnabled
     
     if isEnabled then
         if not teleportLoop then
             teleportLoop = spawn(function()
-                while tpActive do
-                    pcall(teleportToNPC)
+                while mobTeleportActive do
+                    pcall(function()
+                        local character = game.Players.LocalPlayer.Character
+                        if character and character:FindFirstChild("HumanoidRootPart") then
+                            local nearestEnemy = findNearestEnemy()
+                            if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
+                                -- Calculate position behind and above the enemy
+                                local enemyPos = nearestEnemy.HumanoidRootPart.Position
+                                local offset = nearestEnemy.HumanoidRootPart.CFrame.LookVector * -5 -- 5 studs behind
+                                local teleportPos = CFrame.new(enemyPos + offset + Vector3.new(0, 3, 0)) -- 3 studs above
+                                
+                                -- Make character face the enemy
+                                teleportPos = CFrame.new(teleportPos.Position, enemyPos)
+                                
+                                -- Teleport
+                                character.HumanoidRootPart.CFrame = teleportPos
+                            end
+                        end
+                    end)
                     task.wait(0.1)
                 end
             end)
         end
     else
-        if softLockConnection then
-            softLockConnection:Disconnect()
-            softLockConnection = nil
+        mobTeleportActive = false
+        if teleportLoop then
+            teleportLoop = nil
         end
-        teleportLoop = nil
     end
 end
 
