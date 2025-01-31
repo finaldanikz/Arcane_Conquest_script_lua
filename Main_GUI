@@ -75,15 +75,14 @@ end
 
 -- Auto Hit functionality
 local autoHitActive = false
-local clickRemote = game:GetService("ReplicatedStorage"):WaitForChild("Click")
-
--- Create a single loop that runs the entire time
 local autoHitLoop = coroutine.create(function()
     while true do
         if autoHitActive then
             pcall(function()
-                -- Try firing the remote directly
-                clickRemote:FireServer(false)
+                local args = {
+                    [1] = true
+                }
+                game:GetService("ReplicatedStorage").Click:FireServer(unpack(args))
             end)
         end
         task.wait(0.1)
@@ -92,8 +91,6 @@ end)
 
 local function toggleAutoHit(isEnabled)
     autoHitActive = isEnabled
-    
-    -- Start the loop if it hasn't been started yet
     if isEnabled and coroutine.status(autoHitLoop) == "suspended" then
         coroutine.resume(autoHitLoop)
     end
