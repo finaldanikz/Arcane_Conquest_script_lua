@@ -167,33 +167,94 @@ local function toggleAutoAbility(isEnabled)
 end
 
 -- Mob Teleport functionality
-local mobTeleportActive = false
-local mobTeleportLoop = nil
+local function findNearestNPC()
+    local nearestNPC = nil
+    local nearestDistance = math.huge
+    
+    local Character = player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local dungeon = workspace:FindFirstChild("enemies")
+    if not dungeon then return end
+    
+    for _, child in ipairs(dungeon:GetChildren()) do
+        if child:FindFirstChild("enemiesFolder") then
+            for _, npc in ipairs(child.enemiesFolder:GetChildren()) do
+                if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                    local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestNPC = npc
+                    end
+                end
+            end
+        end
+    end
+    return nearestNPC
+end
+
+local function softLockCharacter(character, position)
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local connection
+        connection = game:GetService("RunService").Heartbeat:Connect(function()
+            if character.Parent and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = position
+            else
+                connection:Disconnect()
+            end
+        end)
+        return connection
+    end
+end
+
+local softLockConnection
+local tpActive = false
+
+local function teleportToNPC()
+    if not tpActive then return end
+    
+    local Character = player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local npc = findNearestNPC()
+    if npc and npc:FindFirstChild("HumanoidRootPart") then
+        local npcPosition = npc.HumanoidRootPart.Position
+        local teleportPosition = Vector3.new(npcPosition.X, npcPosition.Y + 9, npcPosition.Z)
+        
+        local lookVector = (npcPosition - teleportPosition).Unit
+        local lookCFrame = CFrame.new(teleportPosition, teleportPosition + lookVector)
+        
+        Character.HumanoidRootPart.CFrame = lookCFrame
+        
+        if softLockConnection then
+            softLockConnection:Disconnect()
+        end
+        
+        softLockConnection = softLockCharacter(Character, lookCFrame)
+    end
+end
+
+-- Update the toggle function to use the new teleport system
+local teleportLoop = nil
 
 local function toggleMobTeleport(isEnabled)
-    mobTeleportActive = isEnabled
+    tpActive = isEnabled
+    
     if isEnabled then
-        if not mobTeleportLoop then
-            mobTeleportLoop = spawn(function()
-                while mobTeleportActive do  -- Removed wait from the while condition
-                    pcall(function()
-                        local character = player.Character
-                        if character and character:FindFirstChild("HumanoidRootPart") then
-                            local nearestNPC = findNearestNPC()
-                            if nearestNPC and nearestNPC:FindFirstChild("HumanoidRootPart") then
-                                character.HumanoidRootPart.CFrame = nearestNPC.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
-                            end
-                        end
-                    end)
-                    task.wait(0.1)  -- Moved wait to end of loop
+        if not teleportLoop then
+            teleportLoop = spawn(function()
+                while tpActive do
+                    pcall(teleportToNPC)
+                    task.wait(0.1)
                 end
             end)
         end
     else
-        mobTeleportActive = false
-        if mobTeleportLoop then
-            mobTeleportLoop = nil
+        if softLockConnection then
+            softLockConnection:Disconnect()
+            softLockConnection = nil
         end
+        teleportLoop = nil
     end
 end
 
