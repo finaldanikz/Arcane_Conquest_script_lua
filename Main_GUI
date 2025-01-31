@@ -167,7 +167,6 @@ local function toggleAutoAbility(isEnabled)
 end
 
 
--- Mob Teleport functionality
 local function findNearestEnemy()
     local nearestEnemy = nil
     local nearestDistance = math.huge
@@ -194,9 +193,32 @@ local function findNearestEnemy()
     return nearestEnemy
 end
 
--- Teleport functionality
+-- Tween functionality
+local TweenService = game:GetService("TweenService")
 local mobTeleportActive = false
 local teleportLoop = nil
+
+local function tweenToEnemy(character, enemy)
+    local tweenInfo = TweenInfo.new(
+        0.5, -- Time
+        Enum.EasingStyle.Linear, -- EasingStyle
+        Enum.EasingDirection.Out, -- EasingDirection
+        0, -- RepeatCount (0 means don't repeat)
+        false, -- Reverses
+        0 -- DelayTime
+    )
+    
+    local targetPos = enemy.HumanoidRootPart.Position + Vector3.new(0, 3, 0)
+    
+    local tween = TweenService:Create(
+        character.HumanoidRootPart,
+        tweenInfo,
+        {CFrame = CFrame.new(targetPos, enemy.HumanoidRootPart.Position)}
+    )
+    
+    tween:Play()
+    return tween
+end
 
 local function toggleMobTeleport(isEnabled)
     mobTeleportActive = isEnabled
@@ -210,16 +232,9 @@ local function toggleMobTeleport(isEnabled)
                         if character and character:FindFirstChild("HumanoidRootPart") then
                             local nearestEnemy = findNearestEnemy()
                             if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
-                                -- Calculate position behind and above the enemy
-                                local enemyPos = nearestEnemy.HumanoidRootPart.Position
-                                local offset = nearestEnemy.HumanoidRootPart.CFrame.LookVector * -5 -- 5 studs behind
-                                local teleportPos = CFrame.new(enemyPos + offset + Vector3.new(0, 3, 0)) -- 3 studs above
-                                
-                                -- Make character face the enemy
-                                teleportPos = CFrame.new(teleportPos.Position, enemyPos)
-                                
-                                -- Teleport
-                                character.HumanoidRootPart.CFrame = teleportPos
+                                -- Create and play tween
+                                local tween = tweenToEnemy(character, nearestEnemy)
+                                tween.Completed:Wait()
                             end
                         end
                     end)
@@ -234,7 +249,6 @@ local function toggleMobTeleport(isEnabled)
         end
     end
 end
-
 local function createGui()
     if gui then 
         gui:Destroy() 
