@@ -1,3 +1,8 @@
+local existingGui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("PersistentGUI")
+if existingGui then
+    existingGui:Destroy()
+end
+
 -- Initialize variables at the top
 local player = game.Players.LocalPlayer
 local gui = nil
@@ -70,28 +75,24 @@ end
 
 -- Auto Hit functionality
 local autoHitActive = false
-local autoHitLoop = nil
+local autoHitLoop = coroutine.create(function()
+    while true do
+        if autoHitActive then
+            pcall(function()
+                local args = {
+                    [1] = false
+                }
+                game:GetService("ReplicatedStorage").Click:FireServer(unpack(args))
+            end)
+        end
+        task.wait(0.1)
+    end
+end)
 
 local function toggleAutoHit(isEnabled)
     autoHitActive = isEnabled
-    if isEnabled then
-        if not autoHitLoop then
-            autoHitLoop = spawn(function()
-                while autoHitActive and wait(0.1) do
-                    pcall(function()
-                        local args = {
-                            [1] = false
-                        }
-                        game:GetService("ReplicatedStorage").Click:FireServer(unpack(args))
-                    end)
-                end
-            end)
-        end
-    else
-        autoHitActive = false
-        if autoHitLoop then
-            autoHitLoop = nil
-        end
+    if isEnabled and coroutine.status(autoHitLoop) == "suspended" then
+        coroutine.resume(autoHitLoop)
     end
 end
 
@@ -137,6 +138,7 @@ local function toggleAutoAbility(isEnabled)
         end
     end
 end
+
 
 local function createGui()
     if gui then 
