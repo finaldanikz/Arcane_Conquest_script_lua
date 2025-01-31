@@ -73,6 +73,33 @@ makeDraggable = function(object)
     end)
 end
 
+-- Find Nearest NPC Function
+local function findNearestNPC()
+    local nearestNPC = nil
+    local nearestDistance = math.huge
+    
+    local Character = player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local enemies = workspace:FindFirstChild("enemies")
+    if not enemies then return end
+    
+    for _, child in ipairs(enemies:GetChildren()) do
+        if child:FindFirstChild("enemiesFolder") then
+            for _, npc in ipairs(child.enemiesFolder:GetChildren()) do
+                if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                    local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestNPC = npc
+                    end
+                end
+            end
+        end
+    end
+    return nearestNPC
+end
+
 -- Auto Hit functionality
 local autoHitActive = false
 local autoHitLoop = coroutine.create(function()
@@ -139,6 +166,35 @@ local function toggleAutoAbility(isEnabled)
     end
 end
 
+-- Mob Teleport functionality
+local mobTeleportActive = false
+local mobTeleportLoop = nil
+
+local function toggleMobTeleport(isEnabled)
+    mobTeleportActive = isEnabled
+    if isEnabled then
+        if not mobTeleportLoop then
+            mobTeleportLoop = spawn(function()
+                while mobTeleportActive and wait(0.1) do
+                    pcall(function()
+                        local character = player.Character
+                        if character and character:FindFirstChild("HumanoidRootPart") then
+                            local nearestNPC = findNearestNPC()
+                            if nearestNPC and nearestNPC:FindFirstChild("HumanoidRootPart") then
+                                character.HumanoidRootPart.CFrame = nearestNPC.HumanoidRootPart.CFrame * CFrame.new(0, 0, 5)
+                            end
+                        end
+                    end)
+                end
+            end)
+        end
+    else
+        mobTeleportActive = false
+        if mobTeleportLoop then
+            mobTeleportLoop = nil
+        end
+    end
+end
 
 local function createGui()
     if gui then 
@@ -221,9 +277,9 @@ local function createGui()
     HeaderLabel.Parent = MainFrame
     
     -- Button Container setup
-    ButtonContainer.Size = UDim2.new(0.8, 0, 0.45, 0)  -- Made container smaller
-    ButtonContainer.Position = UDim2.new(0.5, 0, 0.75, 0)  -- Centered position
-    ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)  -- Center anchor point
+    ButtonContainer.Size = UDim2.new(0.8, 0, 0.45, 0)
+    ButtonContainer.Position = UDim2.new(0.5, 0, 0.75, 0)
+    ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = MainFrame
     
@@ -234,10 +290,10 @@ local function createGui()
     -- Grid layout for buttons
     local UIGridLayout = Instance.new("UIGridLayout")
     UIGridLayout.Parent = ButtonContainer
-    UIGridLayout.CellSize = UDim2.new(0.8, 0, 0.3, 0)  -- Made buttons bigger
-    UIGridLayout.CellPadding = UDim2.new(0, 10, 0, 10)  -- Added more padding
+    UIGridLayout.CellSize = UDim2.new(0.8, 0, 0.25, 0)  -- Adjusted for three buttons
+    UIGridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
     UIGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIGridLayout.FillDirectionMaxCells = 1  -- Changed to 1 for vertical layout
+    UIGridLayout.FillDirectionMaxCells = 1
     UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     UIGridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
     
@@ -304,6 +360,7 @@ local function createGui()
     -- Create buttons
     createToggleButton(1, "Auto Hit", toggleAutoHit)
     createToggleButton(2, "Auto Ability", toggleAutoAbility)
+    createToggleButton(3, "Mob Teleport", toggleMobTeleport)
     
     CloseButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = not MainFrame.Visible
