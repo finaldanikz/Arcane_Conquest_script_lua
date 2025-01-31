@@ -175,7 +175,7 @@ local function toggleMobTeleport(isEnabled)
     if isEnabled then
         if not mobTeleportLoop then
             mobTeleportLoop = spawn(function()
-                while mobTeleportActive and wait(0.1) do
+                while mobTeleportActive do  -- Removed wait from the while condition
                     pcall(function()
                         local character = player.Character
                         if character and character:FindFirstChild("HumanoidRootPart") then
@@ -185,6 +185,7 @@ local function toggleMobTeleport(isEnabled)
                             end
                         end
                     end)
+                    task.wait(0.1)  -- Moved wait to end of loop
                 end
             end)
         end
