@@ -85,7 +85,7 @@ local autoHitLoop = coroutine.create(function()
                 game:GetService("ReplicatedStorage").Click:FireServer(unpack(args))
             end)
         end
-        task.wait(0.1)
+        task.wait(0.3)
     end
 end)
 
@@ -105,7 +105,7 @@ local function toggleAutoAbility(isEnabled)
     if isEnabled then
         if not autoAbilityLoop then
             autoAbilityLoop = spawn(function()
-                while autoAbilityActive and wait(0.1) do
+                while autoAbilityActive and wait(0.5) do
                     pcall(function()
                         -- Fire Spell1
                         local spell1Args = {
