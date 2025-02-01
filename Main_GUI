@@ -1,6 +1,3 @@
-wait(1)
-loadstring(game:HttpGet('https://raw.githubusercontent.com/CelestialCharm2/RobloxKickdisabling/refs/heads/main/robloxkickdisabling.txt'))()
-
 local existingGui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("PersistentGUI")
 if existingGui then
     existingGui:Destroy()
