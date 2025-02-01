@@ -129,9 +129,6 @@ local function toggleAutoHit(isEnabled)
 end
 
 -- Auto Ability functionality
-local autoAbilityActive = false
-local autoAbilityLoop = nil
-
 local function toggleAutoAbility(isEnabled)
     autoAbilityActive = isEnabled
     if isEnabled then
@@ -139,26 +136,30 @@ local function toggleAutoAbility(isEnabled)
             autoAbilityLoop = spawn(function()
                 while autoAbilityActive and wait(0.5) do
                     pcall(function()
-                        -- Fire Spell1
-                        local spell1Args = {
-                            [1] = "Spell1",
-                            [2] = Vector3.new(0, 0, 0),
-                            [3] = Vector3.new(0, 0, 0),
-                            [4] = 0
-                        }
-                        game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell1Args))
-                        
-                        -- Small delay between spells
-                        wait(0.1)
-                        
-                        -- Fire Spell2
-                        local spell2Args = {
-                            [1] = "Spell2",
-                            [2] = Vector3.new(0, 0, 0),
-                            [3] = Vector3.new(0, 0, 0),
-                            [4] = 0
-                        }
-                        game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell2Args))
+                        local character = game.Players.LocalPlayer.Character
+                        if character and character:FindFirstChild("HumanoidRootPart") then
+                            local lookVector = character.HumanoidRootPart.CFrame.LookVector
+                            
+                            -- Fire Spell1 in player's look direction
+                            local spell1Args = {
+                                [1] = "Spell1",
+                                [2] = character.HumanoidRootPart.Position,
+                                [3] = lookVector,
+                                [4] = 0
+                            }
+                            game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell1Args))
+                            
+                            wait(0.1)
+                            
+                            -- Fire Spell2 in player's look direction
+                            local spell2Args = {
+                                [1] = "Spell2",
+                                [2] = character.HumanoidRootPart.Position,
+                                [3] = lookVector,
+                                [4] = 0
+                            }
+                            game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell2Args))
+                        end
                     end)
                 end
             end)
@@ -170,6 +171,7 @@ local function toggleAutoAbility(isEnabled)
         end
     end
 end
+
 
 local function findNearestEnemy()
     local nearestEnemy = nil
@@ -197,7 +199,7 @@ local function findNearestEnemy()
     return nearestEnemy
 end
 
--- Tween functionality
+-- teleport functionality
 local TweenService = game:GetService("TweenService")
 local mobTeleportActive = false
 local teleportLoop = nil
@@ -236,9 +238,9 @@ local function toggleMobTeleport(isEnabled)
                         if character and character:FindFirstChild("HumanoidRootPart") then
                             local nearestEnemy = findNearestEnemy()
                             if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
-                                -- Create and play tween
-                                local tween = tweenToEnemy(character, nearestEnemy)
-                                tween.Completed:Wait()
+                                -- Instant teleport instead of tweening
+                                local targetPos = nearestEnemy.HumanoidRootPart.Position + Vector3.new(0, enemyRange, 0)
+                                character.HumanoidRootPart.CFrame = CFrame.new(targetPos, nearestEnemy.HumanoidRootPart.Position)
                             end
                         end
                     end)
@@ -416,14 +418,16 @@ local function createGui()
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = MainFrame
     
-    local mainFrameCorner = Instance.new("UICorner")
-    mainFrameCorner.CornerRadius = UDim.new(0.05, 0)
-    mainFrameCorner.Parent = MainFrame
-    
+    ButtonContainer.Size = UDim2.new(0.8, 0, 0.15, 0)  -- Reduced height
+    ButtonContainer.Position = UDim2.new(0.5, 0, 0.45, 0)
+    ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
+    ButtonContainer.BackgroundTransparency = 1
+    ButtonContainer.Parent = MainFrame
+
     local UIGridLayout = Instance.new("UIGridLayout")
     UIGridLayout.Parent = ButtonContainer
-    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.8, 0)  -- Make cells smaller and fit two per row
-    UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.1, 0)
+    UIGridLayout.CellSize = UDim2.new(0.3, 0, 0.8, 0)  -- Made cells smaller
+    UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.1, 0)  -- Added padding
     UIGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIGridLayout.FillDirection = Enum.FillDirection.Horizontal
     UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -593,38 +597,32 @@ end
 -- Update slider positions
 createSlider(
     MainFrame, 
-    UDim2.new(0.1, 0, 0.7, 0),  -- Moved down
+    UDim2.new(0.1, 0, 0.65, 0),  -- Moved up
     "Tween Speed", 
     16, 
     150, 
-    tweenSpeed, 
+    savedSettings["tweenSpeed"] or tweenSpeed,  -- Load from settings
     function(value) 
         tweenSpeed = value 
+        savedSettings["tweenSpeed"] = value  -- Save to settings
+        saveSettings(savedSettings)
     end
 )
 
 createSlider(
     MainFrame, 
-    UDim2.new(0.1, 0, 0.9, 0),  -- Moved down
+    UDim2.new(0.1, 0, 0.8, 0),  -- Moved up
     "Enemy Range", 
     1, 
     15, 
-    enemyRange, 
+    savedSettings["enemyRange"] or enemyRange,  -- Load from settings
     function(value) 
         enemyRange = value 
+        savedSettings["enemyRange"] = value  -- Save to settings
+        saveSettings(savedSettings)
     end
 )
-    
-    CloseButton.MouseButton1Click:Connect(function()
-        MainFrame.Visible = not MainFrame.Visible
-    end)
-    
-    gui = ScreenGui
-    mainFrame = MainFrame
-    closeButton = CloseButton
-    
-    return ScreenGui, MainFrame, CloseButton
-end
+
 
 -- Initialize the GUI
 createGui()
