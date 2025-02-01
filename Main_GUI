@@ -9,8 +9,8 @@ local gui = nil
 local mainFrame = nil
 local closeButton = nil
 local saveFilePath = "settings.txt"
-local tweenSpeed = 16
-local enemyRange = 1
+local tpDelay = 2.5  -- Default teleport delay of 2.5 seconds
+local enemyRange = 5  -- Default range from enemy
 
 -- Forward declare functions that are used before their definitions
 local createGui
@@ -235,9 +235,24 @@ local function toggleMobTeleport(isEnabled)
                         if character and character:FindFirstChild("HumanoidRootPart") then
                             local nearestEnemy = findNearestEnemy()
                             if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
-                                -- Instant teleport instead of tweening
-                                local targetPos = nearestEnemy.HumanoidRootPart.Position + Vector3.new(0, enemyRange, 0)
-                                character.HumanoidRootPart.CFrame = CFrame.new(targetPos, nearestEnemy.HumanoidRootPart.Position)
+                                -- Calculate position at the same height but at specified range
+                                local enemyPos = nearestEnemy.HumanoidRootPart.Position
+                                local playerPos = character.HumanoidRootPart.Position
+                                
+                                -- Keep the same height as the player
+                                local targetY = playerPos.Y
+                                
+                                -- Calculate direction vector in XZ plane
+                                local direction = (enemyPos - playerPos) * Vector3.new(1, 0, 1)
+                                direction = direction.Unit
+                                
+                                -- Calculate target position
+                                local targetPos = enemyPos - (direction * enemyRange)
+                                targetPos = Vector3.new(targetPos.X, targetY, targetPos.Z)
+                                
+                                -- Teleport after delay
+                                wait(tpDelay)
+                                character.HumanoidRootPart.CFrame = CFrame.new(targetPos, enemyPos)
                             end
                         end
                     end)
@@ -253,6 +268,7 @@ local function toggleMobTeleport(isEnabled)
     end
 end
 
+-- slider
 local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
     local sliderContainer = Instance.new("Frame")
     sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
@@ -341,6 +357,8 @@ local function createGui()
     if gui then 
         gui:Destroy() 
     end
+
+    local function createGui()
     
     local ScreenGui = Instance.new("ScreenGui")
     local MainFrame = Instance.new("Frame")
@@ -592,33 +610,39 @@ local function createGui()
 end
 
 -- Update slider positions
-createSlider(
-    MainFrame, 
-    UDim2.new(0.1, 0, 0.65, 0),  -- Moved up
-    "Tween Speed", 
-    16, 
-    150, 
-    savedSettings["tweenSpeed"] or tweenSpeed,  -- Load from settings
-    function(value) 
-        tweenSpeed = value 
-        savedSettings["tweenSpeed"] = value  -- Save to settings
-        saveSettings(savedSettings)
-    end
-)
+    createSlider(
+        MainFrame, 
+        UDim2.new(0.1, 0, 0.65, 0),
+        "TP Delay", 
+        0, 
+        5, 
+        savedSettings["tpDelay"] or tpDelay,
+        function(value) 
+            tpDelay = value 
+            savedSettings["tpDelay"] = value
+            saveSettings(savedSettings)
+        end
+    )
 
-createSlider(
-    MainFrame, 
-    UDim2.new(0.1, 0, 0.8, 0),  -- Moved up
-    "Enemy Range", 
-    1, 
-    15, 
-    savedSettings["enemyRange"] or enemyRange,  -- Load from settings
-    function(value) 
-        enemyRange = value 
-        savedSettings["enemyRange"] = value  -- Save to settings
-        saveSettings(savedSettings)
-    end
-)
+    createSlider(
+        MainFrame, 
+        UDim2.new(0.1, 0, 0.8, 0),
+        "Enemy Range", 
+        1, 
+        15, 
+        savedSettings["enemyRange"] or enemyRange,
+        function(value) 
+            enemyRange = value 
+            savedSettings["enemyRange"] = value
+            saveSettings(savedSettings)
+        end
+    )
+end
+
+-- Initialize variables when script starts
+local savedSettings = loadSettings()
+tpDelay = savedSettings["tpDelay"] or 2.5
+enemyRange = savedSettings["enemyRange"] or 5
 
 
 -- Initialize the GUI
