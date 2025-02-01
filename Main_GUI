@@ -13,6 +13,8 @@ local tpDelay = 2.5  -- Default teleport delay of 2.5 seconds
 local enemyRange = 5  -- Default range from enemy
 local autoAbilityLoop = nil
 local autoAbilityActive = false
+local autoRetryActive = false
+local retryLoop = nil
 
 -- Utility functions
 local function loadSettings()
@@ -68,6 +70,14 @@ local function makeDraggable(object)
         if input == dragInput and dragging then
             update(input)
         end
+    end)
+end
+
+local function handleRetry()
+    pcall(function()
+        game:GetService("ReplicatedStorage").Start:FireServer()
+        task.wait(0.1)
+        game:GetService("ReplicatedStorage").Retry:FireServer()
     end)
 end
 
@@ -249,6 +259,25 @@ local function toggleMobTeleport(isEnabled)
     end
 end
 
+local function toggleAutoRetry(isEnabled)
+    autoRetryActive = isEnabled
+    
+    if isEnabled then
+        if not retryLoop then
+            retryLoop = spawn(function()
+                while autoRetryActive do
+                    handleRetry()
+                    task.wait(1)
+                end
+            end)
+        end
+    else
+        autoRetryActive = false
+        if retryLoop then
+            retryLoop = nil
+        end
+    end
+end
 
 -- Create the main GUI
 local function createGui()
@@ -262,6 +291,7 @@ local function createGui()
     local CloseButton = Instance.new("TextButton")
     local ButtonContainer = Instance.new("Frame")
     local HeaderLabel = Instance.new("TextLabel")
+    local retryButton = createRetryButton(MainFrame)
     
     ScreenGui.Name = "PersistentGUI"
     ScreenGui.ResetOnSpawn = false
@@ -402,6 +432,7 @@ local function createGui()
     createToggleButton(1, "Auto Hit", toggleAutoHit)
     createToggleButton(2, "Auto Ability", toggleAutoAbility)
     createToggleButton(3, "Mob Teleport", toggleMobTeleport)
+    createToggleButton(4, "Auto Retry", toggleAutoRetry)
 
     -- Create sliders
     local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
@@ -498,6 +529,36 @@ local function createGui()
     
         return sliderContainer
     end
+
+    local function createRetryButton(parent)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0.3, 0, 0.08, 0)
+    button.Position = UDim2.new(0.35, 0, 0.9, 0)
+    button.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+    button.Text = "Retry"
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.Font = Enum.Font.GothamBlack
+    button.TextSize = 14
+    button.Parent = parent
+    button.ZIndex = 2
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.3, 0)
+    corner.Parent = button
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Transparency = 0.7
+    stroke.Thickness = 1
+    stroke.Parent = button
+    
+    button.MouseButton1Click:Connect(function()
+        handleRetry()
+    end)
+    
+    return button
+end
+
     
     -- Create sliders with loaded settings
     createSlider(
@@ -538,3 +599,8 @@ end
 
 -- Initialize the GUI
 local guiInstance = createGui()
+
+spawn(function()
+    task.wait(1)
+    handleRetry()
+end)
