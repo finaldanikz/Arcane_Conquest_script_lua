@@ -1,3 +1,4 @@
+-- Initialize GUI and variables
 local existingGui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("PersistentGUI")
 if existingGui then
     existingGui:Destroy()
@@ -226,8 +227,9 @@ local function createGui()
     
     local ScreenGui = Instance.new("ScreenGui")
     local MainFrame = Instance.new("Frame")
-    local HeaderLabel = Instance.new("TextLabel")
+    local ImageLabel = Instance.new("ImageLabel")
     local ButtonContainer = Instance.new("Frame")
+    local HeaderLabel = Instance.new("TextLabel")
     local CloseButton = Instance.new("TextButton")
     
     ScreenGui.Name = "PersistentGUI"
@@ -237,107 +239,116 @@ local function createGui()
     
     gui = ScreenGui
     
-    -- Main Frame with rounded corners and gradient
+    -- Main Frame
     MainFrame.Size = UDim2.new(0.25, 0, 0.7, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored original dark color
     MainFrame.BackgroundTransparency = 0.1
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
     MainFrame.Visible = true
+    MainFrame.ZIndex = 1
     MainFrame.Parent = ScreenGui
     
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0.02, 0)
-    mainCorner.Parent = MainFrame
+    -- Main Frame stroke
+    local mainFrameStroke = Instance.new("UIStroke")
+    mainFrameStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
+    mainFrameStroke.Thickness = 2
+    mainFrameStroke.Parent = MainFrame
+
+    -- Logo
+    ImageLabel.Size = UDim2.new(1, 0, 0.6, 0)
+    ImageLabel.Position = UDim2.new(0, 0, 0, 0)
+    ImageLabel.BackgroundTransparency = 1
+    ImageLabel.Image = "rbxassetid://15131645462159"  -- Your original logo ID
+    ImageLabel.ScaleType = Enum.ScaleType.Fit
+    ImageLabel.ZIndex = 2
+    ImageLabel.Parent = MainFrame
     
-    local gradient = Instance.new("UIGradient")
-    gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 45)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 30))
-    })
-    gradient.Rotation = 45
-    gradient.Parent = MainFrame
-    
-    -- Header with modern font and styling
     HeaderLabel.Size = UDim2.new(1, 0, 0.1, 0)
     HeaderLabel.Position = UDim2.new(0, 0, 0, 0)
     HeaderLabel.BackgroundTransparency = 1
     HeaderLabel.Text = "Kinayo Enhanced"
-    HeaderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HeaderLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
     HeaderLabel.Font = Enum.Font.GothamBold
     HeaderLabel.TextSize = 24
+    HeaderLabel.ZIndex = 3
     HeaderLabel.Parent = MainFrame
     
-    -- Enhanced Close Button
+    -- Close button
     CloseButton.Size = UDim2.new(0, 150, 0, 45)
     CloseButton.Position = UDim2.new(0.5, -75, 0, -40)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     CloseButton.BackgroundTransparency = 0.1
     CloseButton.Text = "Open/Close"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
+    CloseButton.Font = Enum.Font.GothamBlack
     CloseButton.TextSize = 16
     CloseButton.Parent = ScreenGui
+    CloseButton.ZIndex = 10
     
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0.3, 0)
     closeCorner.Parent = CloseButton
     
-    -- Button Container with modern layout
-    ButtonContainer.Size = UDim2.new(0.9, 0, 0.6, 0)
+    local closeStroke = Instance.new("UIStroke")
+    closeStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
+    closeStroke.Transparency = 0.8
+    closeStroke.Thickness = 1
+    closeStroke.Parent = CloseButton
+    
+    -- Button container
+    ButtonContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
     ButtonContainer.Position = UDim2.new(0.5, 0, 0.45, 0)
     ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = MainFrame
-    
+
     local UIGridLayout = Instance.new("UIGridLayout")
     UIGridLayout.Parent = ButtonContainer
-    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.15, 0)
-    UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.05, 0)
+    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.8, 0)
+    UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.1, 0)
     UIGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIGridLayout.FillDirection = Enum.FillDirection.Horizontal
     UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    
-    -- Make frames draggable
+    UIGridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
     makeDraggable(CloseButton)
     makeDraggable(MainFrame)
-    
-    -- Create enhanced toggle buttons
+
+    -- Create toggle buttons with restored styling
     local savedSettings = loadSettings()
-    
+
     local function createToggleButton(number, name, onClick)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(1, 0, 1, 0)
-        button.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-        button.BackgroundTransparency = 0.8
+        button.BackgroundTransparency = 0.1
+        button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
         button.Text = name
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.Font = Enum.Font.GothamBold
+        button.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+        button.Font = Enum.Font.GothamBlack
         button.TextSize = 14
         button.LayoutOrder = number
         button.Parent = ButtonContainer
+        button.ZIndex = 2
         
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0.2, 0)
+        corner.CornerRadius = UDim.new(0.3, 0)
         corner.Parent = button
         
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(86, 71, 201)
-        stroke.Transparency = 0.2
-        stroke.Thickness = 2
+        stroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+        stroke.Transparency = 0.9
+        stroke.Thickness = 1
         stroke.Parent = button
         
         local isEnabled = savedSettings[name] or false
         
         local function updateButtonAppearance()
-            if isEnabled then
-                button.BackgroundTransparency = 0
-                stroke.Transparency = 0
-            else
-                button.BackgroundTransparency = 0.8
-                stroke.Transparency = 0.2
-            end
+            button.BackgroundColor3 = isEnabled and Color3.fromRGB(255, 128, 0) or Color3.fromRGB(30, 30, 30)  -- Restored colors
+            button.TextColor3 = isEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 128, 0)
+            stroke.Transparency = isEnabled and 0.7 or 0.9
         end
         
         updateButtonAppearance()
@@ -353,22 +364,9 @@ local function createGui()
             savedSettings[name] = isEnabled
             saveSettings(savedSettings)
         end)
-        
-        -- Hover effect
-        button.MouseEnter:Connect(function()
-            game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {
-                BackgroundTransparency = isEnabled and 0.2 or 0.6
-            }):Play()
-        end)
-        
-        button.MouseLeave:Connect(function()
-            game:GetService("TweenService"):Create(button, TweenInfo.new(0.2), {
-                BackgroundTransparency = isEnabled and 0 or 0.8
-            }):Play()
-        end)
     end
-    
-    -- Create enhanced buttons with modern styling
+
+    -- Create buttons
     createToggleButton(1, "Auto Hit", toggleAutoHit)
     createToggleButton(2, "Auto Ability", toggleAutoAbility)
     createToggleButton(3, "Mob Teleport", toggleMobTeleport)
@@ -388,8 +386,34 @@ local function createGui()
             end
         end
     end)
+
+    -- Single retry button with restored styling
+    local retryButton = Instance.new("TextButton")
+    retryButton.Size = UDim2.new(0.3, 0, 0.08, 0)
+    retryButton.Position = UDim2.new(0.35, 0, 0.9, 0)
+    retryButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
+    retryButton.Text = "Retry"
+    retryButton.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+    retryButton.Font = Enum.Font.GothamBlack
+    retryButton.TextSize = 14
+    retryButton.Parent = MainFrame
+    retryButton.ZIndex = 2
     
--- Enhanced sliders with modern styling
+    local retryCorner = Instance.new("UICorner")
+    retryCorner.CornerRadius = UDim.new(0.3, 0)
+    retryCorner.Parent = retryButton
+    
+    local retryStroke = Instance.new("UIStroke")
+    retryStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+    retryStroke.Transparency = 0.7
+    retryStroke.Thickness = 1
+    retryStroke.Parent = retryButton
+    
+    retryButton.MouseButton1Click:Connect(function()
+        handleRetry()
+    end)
+
+    -- Create sliders with restored styling
     local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
         local sliderContainer = Instance.new("Frame")
         sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
@@ -401,60 +425,45 @@ local function createGui()
         titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
         titleLabel.BackgroundTransparency = 1
         titleLabel.Text = title
-        titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        titleLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
         titleLabel.TextSize = 14
         titleLabel.Font = Enum.Font.GothamBold
         titleLabel.Parent = sliderContainer
         
-        local sliderBar = Instance.new("Frame")
+        local sliderBar = Instance.new("TextButton")
         sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
         sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        sliderBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
         sliderBar.BorderSizePixel = 0
+        sliderBar.Text = ""
+        sliderBar.AutoButtonColor = false
         sliderBar.Parent = sliderContainer
         
         local fill = Instance.new("Frame")
         fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
-        fill.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+        fill.BackgroundColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
         fill.BorderSizePixel = 0
         fill.Parent = sliderBar
-        
-        local knob = Instance.new("Frame")
-        knob.Size = UDim2.new(0, 16, 0, 16)
-        knob.Position = UDim2.new(defaultValue/(max-min), 0, 0.5, 0)
-        knob.AnchorPoint = Vector2.new(0.5, 0.5)
-        knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        knob.Parent = sliderBar
         
         local valueLabel = Instance.new("TextLabel")
         valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
         valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
         valueLabel.BackgroundTransparency = 1
         valueLabel.Text = tostring(defaultValue)
-        valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        valueLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
         valueLabel.TextSize = 14
         valueLabel.Font = Enum.Font.GothamBold
         valueLabel.Parent = sliderContainer
         
-        -- Add rounded corners
-        local sliderCorner = Instance.new("UICorner")
-        sliderCorner.CornerRadius = UDim.new(0.5, 0)
-        sliderCorner.Parent = sliderBar
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0.5, 0)
+        corner.Parent = sliderBar
         
         local fillCorner = Instance.new("UICorner")
         fillCorner.CornerRadius = UDim.new(0.5, 0)
         fillCorner.Parent = fill
         
-        local knobCorner = Instance.new("UICorner")
-        knobCorner.CornerRadius = UDim.new(1, 0)
-        knobCorner.Parent = knob
-        
-        -- Add shadow effect to knob
-        local knobStroke = Instance.new("UIStroke")
-        knobStroke.Color = Color3.fromRGB(86, 71, 201)
-        knobStroke.Thickness = 2
-        knobStroke.Parent = knob
-        
+        -- [Rest of the slider functionality remains the same...]
         local UserInputService = game:GetService("UserInputService")
         local dragging = false
         
@@ -470,17 +479,7 @@ local function createGui()
             local value = math.floor(min + ((max - min) * relativePos))
             value = math.clamp(value, min, max)
             
-            -- Smooth transition using TweenService
-            local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-            
-            TweenService:Create(fill, tweenInfo, {
-                Size = UDim2.new(relativePos, 0, 1, 0)
-            }):Play()
-            
-            TweenService:Create(knob, tweenInfo, {
-                Position = UDim2.new(relativePos, 0, 0.5, 0)
-            }):Play()
-            
+            fill.Size = UDim2.new(relativePos, 0, 1, 0)
             valueLabel.Text = tostring(value)
             onValueChanged(value)
         end
@@ -508,65 +507,10 @@ local function createGui()
             end
         end)
         
-        -- Add hover effect
-        sliderBar.MouseEnter:Connect(function()
-            TweenService:Create(fill, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(106, 91, 221)
-            }):Play()
-        end)
-        
-        sliderBar.MouseLeave:Connect(function()
-            TweenService:Create(fill, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-            }):Play()
-        end)
-        
         return sliderContainer
     end
     
-    -- Create enhanced retry button
-    local function createRetryButton(parent)
-        local button = Instance.new("TextButton")
-        button.Size = UDim2.new(0.3, 0, 0.08, 0)
-        button.Position = UDim2.new(0.35, 0, 0.9, 0)
-        button.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-        button.Text = "Retry"
-        button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        button.Font = Enum.Font.GothamBold
-        button.TextSize = 14
-        button.Parent = parent
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0.3, 0)
-        corner.Parent = button
-        
-        local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(255, 255, 255)
-        stroke.Transparency = 0.7
-        stroke.Thickness = 1
-        stroke.Parent = button
-        
-        -- Add hover effect
-        button.MouseEnter:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(106, 91, 221)
-            }):Play()
-        end)
-        
-        button.MouseLeave:Connect(function()
-            TweenService:Create(button, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-            }):Play()
-        end)
-        
-        button.MouseButton1Click:Connect(function()
-            handleRetry()
-        end)
-        
-        return button
-    end
-    
-    -- Create sliders with loaded settings
+-- Create sliders with loaded settings
     createSlider(
         MainFrame, 
         UDim2.new(0.1, 0, 0.65, 0),
@@ -594,22 +538,21 @@ local function createGui()
             saveSettings(savedSettings)
         end
     )
-    
-    -- Create retry button
-    createRetryButton(MainFrame)
-    
-    -- Toggle MainFrame visibility with CloseButton
+
+    -- Toggle GUI visibility when close button is clicked
     CloseButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = not MainFrame.Visible
     end)
-    
-    return ScreenGui
+
+    -- Return the created GUI
+    return {
+        ScreenGui = ScreenGui,
+        MainFrame = MainFrame,
+        CloseButton = CloseButton
+    }
 end
 
 -- Initialize the GUI
-local guiInstance = createGui()
-
-spawn(function()
-    task.wait(1)
-    handleRetry()
-end)
+local guiElements = createGui()
+mainFrame = guiElements.MainFrame
+closeButton = guiElements.CloseButton
