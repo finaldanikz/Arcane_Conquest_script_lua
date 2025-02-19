@@ -1,4 +1,3 @@
--- Initialize GUI and variables
 local existingGui = game.Players.LocalPlayer.PlayerGui:FindFirstChild("PersistentGUI")
 if existingGui then
     existingGui:Destroy()
@@ -10,15 +9,17 @@ local gui = nil
 local mainFrame = nil
 local closeButton = nil
 local saveFilePath = "settings.txt"
-local tpDelay = 2.5  -- Default teleport delay of 2.5 seconds
-local enemyRange = 5  -- Default range from enemy
-local autoAbilityLoop = nil
-local autoAbilityActive = false
-local autoRetryActive = false
-local retryLoop = nil
+local tweenSpeed = 16
+local enemyRange = 1
+
+-- Forward declare functions that are used before their definitions
+local createGui
+local makeDraggable
+local loadSettings
+local saveSettings
 
 -- Utility functions
-local function loadSettings()
+loadSettings = function()
     local success, data = pcall(function()
         return game:GetService("HttpService"):JSONDecode(readfile(saveFilePath))
     end)
@@ -29,13 +30,13 @@ local function loadSettings()
     end
 end
 
-local function saveSettings(settings)
+saveSettings = function(settings)
     pcall(function()
         writefile(saveFilePath, game:GetService("HttpService"):JSONEncode(settings))
     end)
 end
 
-local function makeDraggable(object)
+makeDraggable = function(object)
     local UserInputService = game:GetService("UserInputService")
     local dragging
     local dragInput
@@ -74,19 +75,7 @@ local function makeDraggable(object)
     end)
 end
 
--- Core functionality
-local function handleRetry()
-    pcall(function()
-        if game:GetService("ReplicatedStorage"):FindFirstChild("Start") then
-            game:GetService("ReplicatedStorage").Start:FireServer()
-            task.wait(0.1)
-            if game:GetService("ReplicatedStorage"):FindFirstChild("Retry") then
-                game:GetService("ReplicatedStorage").Retry:FireServer()
-            end
-        end
-    end)
-end
-
+-- Find Nearest NPC Function
 local function findNearestNPC()
     local nearestNPC = nil
     local nearestDistance = math.huge
@@ -94,15 +83,19 @@ local function findNearestNPC()
     local Character = player.Character
     if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
     
-    local enemies = workspace:FindFirstChild("Enemies") -- Fixed folder name
+    local enemies = workspace:FindFirstChild("enemies")
     if not enemies then return end
     
-    for _, npc in ipairs(enemies:GetChildren()) do
-        if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
-            local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
-            if distance < nearestDistance then
-                nearestDistance = distance
-                nearestNPC = npc
+    for _, child in ipairs(enemies:GetChildren()) do
+        if child:FindFirstChild("enemiesFolder") then
+            for _, npc in ipairs(child.enemiesFolder:GetChildren()) do
+                if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                    local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestNPC = npc
+                    end
+                end
             end
         end
     end
@@ -111,51 +104,58 @@ end
 
 -- Auto Hit functionality
 local autoHitActive = false
-local autoHitLoop = nil
+local autoHitLoop = coroutine.create(function()
+    while true do
+        if autoHitActive then
+            pcall(function()
+                local args = {
+                    [1] = true
+                }
+                game:GetService("ReplicatedStorage").Click:FireServer(unpack(args))
+            end)
+        end
+        task.wait(0.3)
+    end
+end)
 
 local function toggleAutoHit(isEnabled)
     autoHitActive = isEnabled
-    if isEnabled then
-        if not autoHitLoop then
-            autoHitLoop = spawn(function()
-                while autoHitActive and task.wait(0.3) do
-                    pcall(function()
-                        if game:GetService("ReplicatedStorage"):FindFirstChild("Click") then
-                            game:GetService("ReplicatedStorage").Click:FireServer(true)
-                        end
-                    end)
-                end
-            end)
-        end
-    else
-        autoHitActive = false
-        if autoHitLoop then
-            autoHitLoop = nil
-        end
+    if isEnabled and coroutine.status(autoHitLoop) == "suspended" then
+        coroutine.resume(autoHitLoop)
     end
 end
 
 -- Auto Ability functionality
+local autoAbilityActive = false
+local autoAbilityLoop = nil
+
 local function toggleAutoAbility(isEnabled)
     autoAbilityActive = isEnabled
     if isEnabled then
         if not autoAbilityLoop then
             autoAbilityLoop = spawn(function()
-                while autoAbilityActive and task.wait(0.5) do
+                while autoAbilityActive and wait(0.5) do
                     pcall(function()
-                        local character = player.Character
-                        if character and character:FindFirstChild("HumanoidRootPart") then
-                            local lookVector = character.HumanoidRootPart.CFrame.LookVector
-                            local spellRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Spell")
-                            
-                            if spellRemote then
-                                -- Fire Spell1
-                                spellRemote:FireServer("Spell1", character.HumanoidRootPart.Position, lookVector, 0)
-                                task.wait(0.1)
-                                -- Fire Spell2
-                                spellRemote:FireServer("Spell2", character.HumanoidRootPart.Position, lookVector, 0)
-                            end
-                        end
+                        -- Fire Spell1
+                        local spell1Args = {
+                            [1] = "Spell1",
+                            [2] = Vector3.new(0, 0, 0),
+                            [3] = Vector3.new(0, 0, 0),
+                            [4] = 0
+                        }
+                        game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell1Args))
+                        
+                        -- Small delay between spells
+                        wait(0.1)
+                        
+                        -- Fire Spell2
+                        local spell2Args = {
+                            [1] = "Spell2",
+                            [2] = Vector3.new(0, 0, 0),
+                            [3] = Vector3.new(0, 0, 0),
+                            [4] = 0
+                        }
+                        game:GetService("ReplicatedStorage").Spell:FireServer(unpack(spell2Args))
                     end)
                 end
             end)
@@ -168,15 +168,57 @@ local function toggleAutoAbility(isEnabled)
     end
 end
 
--- Teleport functionality
+local function findNearestEnemy()
+    local nearestEnemy = nil
+    local nearestDistance = math.huge
+    
+    local character = game.Players.LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local enemiesFolder = workspace:FindFirstChild("Enemies")
+    if not enemiesFolder then return end
+    
+    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
+        if enemy:FindFirstChild("HumanoidRootPart") and 
+           enemy:FindFirstChild("Humanoid") and 
+           enemy.Humanoid.Health > 0 then
+            
+            local distance = (character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
+            if distance < nearestDistance then
+                nearestDistance = distance
+                nearestEnemy = enemy
+            end
+        end
+    end
+    
+    return nearestEnemy
+end
+
+-- Tween functionality
 local TweenService = game:GetService("TweenService")
 local mobTeleportActive = false
 local teleportLoop = nil
 
-local function calculateCircularPosition(enemyPos, radius, angle)
-    local x = enemyPos.X + (radius * math.cos(angle))
-    local z = enemyPos.Z + (radius * math.sin(angle))
-    return Vector3.new(x, enemyPos.Y, z)
+local function tweenToEnemy(character, enemy)
+    local tweenInfo = TweenInfo.new(
+        1/tweenSpeed, -- Convert speed to time (faster speed = shorter time)
+        Enum.EasingStyle.Linear,
+        Enum.EasingDirection.Out,
+        0,
+        false,
+        0
+    )
+    
+    local targetPos = enemy.HumanoidRootPart.Position + Vector3.new(0, enemyRange, 0)
+    
+    local tween = TweenService:Create(
+        character.HumanoidRootPart,
+        tweenInfo,
+        {CFrame = CFrame.new(targetPos, enemy.HumanoidRootPart.Position)}
+    )
+    
+    tween:Play()
+    return tween
 end
 
 local function toggleMobTeleport(isEnabled)
@@ -184,27 +226,20 @@ local function toggleMobTeleport(isEnabled)
     
     if isEnabled then
         if not teleportLoop then
-            local angle = 0
             teleportLoop = spawn(function()
-                while mobTeleportActive and task.wait(tpDelay) do
+                while mobTeleportActive do
                     pcall(function()
-                        local character = player.Character
+                        local character = game.Players.LocalPlayer.Character
                         if character and character:FindFirstChild("HumanoidRootPart") then
-                            local nearestEnemy = findNearestNPC()
+                            local nearestEnemy = findNearestEnemy()
                             if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
-                                local enemyPos = nearestEnemy.HumanoidRootPart.Position
-                                local targetPos = calculateCircularPosition(enemyPos, enemyRange, angle)
-                                
-                                character.HumanoidRootPart.CFrame = CFrame.new(targetPos, enemyPos)
-                                character.Humanoid.PlatformStand = true
-                                
-                                angle = angle + (math.pi / 180)
-                                if angle >= 2 * math.pi then
-                                    angle = 0
-                                end
+                                -- Create and play tween
+                                local tween = tweenToEnemy(character, nearestEnemy)
+                                tween.Completed:Wait()
                             end
                         end
                     end)
+                    task.wait(0.1)
                 end
             end)
         end
@@ -212,14 +247,94 @@ local function toggleMobTeleport(isEnabled)
         mobTeleportActive = false
         if teleportLoop then
             teleportLoop = nil
-            pcall(function()
-                player.Character.Humanoid.PlatformStand = false
-            end)
         end
     end
 end
 
--- Create GUI
+local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
+    local sliderContainer = Instance.new("Frame")
+    sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
+    sliderContainer.Position = position
+    sliderContainer.BackgroundTransparency = 1
+    sliderContainer.Parent = parent
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = sliderContainer
+
+    local sliderBar = Instance.new("Frame")
+    sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
+    sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Parent = sliderContainer
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+    fill.BorderSizePixel = 0
+    fill.Parent = sliderBar
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(defaultValue)
+    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueLabel.TextSize = 14
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Parent = sliderContainer
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.5, 0)
+    corner.Parent = sliderBar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0.5, 0)
+    fillCorner.Parent = fill
+
+    local dragging = false
+    
+    local function updateValue(input)
+        local pos = input.Position.X
+        local relativePos = (pos - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
+        relativePos = math.clamp(relativePos, 0, 1)
+        
+        local value = math.floor(min + ((max - min) * relativePos))
+        value = math.clamp(value, min, max)
+        
+        fill.Size = UDim2.new(relativePos, 0, 1, 0)
+        valueLabel.Text = tostring(value)
+        onValueChanged(value)
+    end
+
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            updateValue(input)
+        end
+    end)
+
+    sliderBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateValue(input)
+        end
+    end)
+
+    return sliderContainer
+end
+
 local function createGui()
     if gui then 
         gui:Destroy() 
@@ -228,61 +343,21 @@ local function createGui()
     local ScreenGui = Instance.new("ScreenGui")
     local MainFrame = Instance.new("Frame")
     local ImageLabel = Instance.new("ImageLabel")
+    local CloseButton = Instance.new("TextButton")
     local ButtonContainer = Instance.new("Frame")
     local HeaderLabel = Instance.new("TextLabel")
-    local CloseButton = Instance.new("TextButton")
     
     ScreenGui.Name = "PersistentGUI"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.DisplayOrder = 999999999
-    ScreenGui.Parent = player.PlayerGui
+    ScreenGui.Parent = game.Players.LocalPlayer.PlayerGui
     
-    gui = ScreenGui
-    
-    -- Main Frame
-    MainFrame.Size = UDim2.new(0.25, 0, 0.7, 0)
-    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored original dark color
-    MainFrame.BackgroundTransparency = 0.1
-    MainFrame.BorderSizePixel = 0
-    MainFrame.ClipsDescendants = true
-    MainFrame.Visible = true
-    MainFrame.ZIndex = 1
-    MainFrame.Parent = ScreenGui
-    
-    -- Main Frame stroke
-    local mainFrameStroke = Instance.new("UIStroke")
-    mainFrameStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
-    mainFrameStroke.Thickness = 2
-    mainFrameStroke.Parent = MainFrame
-
-    -- Logo
-    ImageLabel.Size = UDim2.new(1, 0, 0.6, 0)
-    ImageLabel.Position = UDim2.new(0, 0, 0, 0)
-    ImageLabel.BackgroundTransparency = 1
-    ImageLabel.Image = "rbxassetid://15131645462159"  -- Your original logo ID
-    ImageLabel.ScaleType = Enum.ScaleType.Fit
-    ImageLabel.ZIndex = 2
-    ImageLabel.Parent = MainFrame
-    
-    HeaderLabel.Size = UDim2.new(1, 0, 0.1, 0)
-    HeaderLabel.Position = UDim2.new(0, 0, 0, 0)
-    HeaderLabel.BackgroundTransparency = 1
-    HeaderLabel.Text = "Kinayo Enhanced"
-    HeaderLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
-    HeaderLabel.Font = Enum.Font.GothamBold
-    HeaderLabel.TextSize = 24
-    HeaderLabel.ZIndex = 3
-    HeaderLabel.Parent = MainFrame
-    
-    -- Close button
     CloseButton.Size = UDim2.new(0, 150, 0, 45)
     CloseButton.Position = UDim2.new(0.5, -75, 0, -40)
-    CloseButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    CloseButton.BackgroundTransparency = 0.1
+    CloseButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    CloseButton.BackgroundTransparency = 0.3
     CloseButton.Text = "Open/Close"
-    CloseButton.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     CloseButton.Font = Enum.Font.GothamBlack
     CloseButton.TextSize = 16
     CloseButton.Parent = ScreenGui
@@ -293,40 +368,77 @@ local function createGui()
     closeCorner.Parent = CloseButton
     
     local closeStroke = Instance.new("UIStroke")
-    closeStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored original orange color
+    closeStroke.Color = Color3.fromRGB(255, 255, 255)
     closeStroke.Transparency = 0.8
     closeStroke.Thickness = 1
     closeStroke.Parent = CloseButton
     
-    -- Button container
-    ButtonContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
-    ButtonContainer.Position = UDim2.new(0.5, 0, 0.45, 0)
+    MainFrame.Size = UDim2.new(0.25, 0, 0.7, 0)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    MainFrame.BackgroundTransparency = 0.5
+    MainFrame.BorderSizePixel = 0
+    MainFrame.ClipsDescendants = true
+    MainFrame.Visible = true
+    MainFrame.ZIndex = 1
+    MainFrame.Parent = ScreenGui
+    
+    local mainFrameStroke = Instance.new("UIStroke")
+    mainFrameStroke.Color = Color3.fromRGB(86, 71, 201)
+    mainFrameStroke.Thickness = 2
+    mainFrameStroke.Parent = MainFrame
+    
+   ImageLabel.Size = UDim2.new(1, 0, 0.6, 0)
+    ImageLabel.Position = UDim2.new(0, 0, 0, 0)
+    ImageLabel.BackgroundTransparency = 1
+    ImageLabel.Image = "rbxassetid://83971645462159"
+    ImageLabel.ScaleType = Enum.ScaleType.Fit
+    ImageLabel.ZIndex = 2
+    ImageLabel.Parent = MainFrame
+    
+    HeaderLabel.Size = UDim2.new(1, 0, 0.1, 0)
+    HeaderLabel.Position = UDim2.new(0, 0, 0, 0)
+    HeaderLabel.BackgroundTransparency = 1
+    HeaderLabel.Text = "Kinayo Ripoff"
+    HeaderLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HeaderLabel.Font = Enum.Font.GothamBold
+    HeaderLabel.TextSize = 24
+    HeaderLabel.ZIndex = 3
+    HeaderLabel.Parent = MainFrame
+    
+    ButtonContainer.Size = UDim2.new(0.8, 0, 0.2, 0) 
+    ButtonContainer.Position = UDim2.new(0.5, 0, 0.45, 0)  
     ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = MainFrame
-
+    
+    local mainFrameCorner = Instance.new("UICorner")
+    mainFrameCorner.CornerRadius = UDim.new(0.05, 0)
+    mainFrameCorner.Parent = MainFrame
+    
     local UIGridLayout = Instance.new("UIGridLayout")
     UIGridLayout.Parent = ButtonContainer
-    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.8, 0)
+    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.8, 0)  -- Make cells smaller and fit two per row
     UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.1, 0)
     UIGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
     UIGridLayout.FillDirection = Enum.FillDirection.Horizontal
     UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     UIGridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
 
+    
     makeDraggable(CloseButton)
     makeDraggable(MainFrame)
-
-    -- Create toggle buttons with restored styling
+    
     local savedSettings = loadSettings()
-
+    
     local function createToggleButton(number, name, onClick)
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(1, 0, 1, 0)
         button.BackgroundTransparency = 0.1
-        button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
+        button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
         button.Text = name
-        button.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+        button.TextColor3 = Color3.fromRGB(0, 0, 0)
         button.Font = Enum.Font.GothamBlack
         button.TextSize = 14
         button.LayoutOrder = number
@@ -338,7 +450,7 @@ local function createGui()
         corner.Parent = button
         
         local stroke = Instance.new("UIStroke")
-        stroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored orange color
+        stroke.Color = Color3.fromRGB(255, 255, 255)
         stroke.Transparency = 0.9
         stroke.Thickness = 1
         stroke.Parent = button
@@ -346,9 +458,15 @@ local function createGui()
         local isEnabled = savedSettings[name] or false
         
         local function updateButtonAppearance()
-            button.BackgroundColor3 = isEnabled and Color3.fromRGB(255, 128, 0) or Color3.fromRGB(30, 30, 30)  -- Restored colors
-            button.TextColor3 = isEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(255, 128, 0)
-            stroke.Transparency = isEnabled and 0.7 or 0.9
+            if isEnabled then
+                button.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+                button.TextColor3 = Color3.fromRGB(255, 255, 255)
+                stroke.Transparency = 0.7
+            else
+                button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                button.TextColor3 = Color3.fromRGB(0, 0, 0)
+                stroke.Transparency = 0.9
+            end
         end
         
         updateButtonAppearance()
@@ -365,194 +483,145 @@ local function createGui()
             saveSettings(savedSettings)
         end)
     end
-
+    
     -- Create buttons
     createToggleButton(1, "Auto Hit", toggleAutoHit)
     createToggleButton(2, "Auto Ability", toggleAutoAbility)
     createToggleButton(3, "Mob Teleport", toggleMobTeleport)
-    createToggleButton(4, "Auto Retry", function(enabled)
-        autoRetryActive = enabled
-        if enabled then
-            if not retryLoop then
-                retryLoop = spawn(function()
-                    while autoRetryActive and task.wait(1) do
-                        handleRetry()
-                    end
-                end)
-            end
-        else
-            if retryLoop then
-                retryLoop = nil
-            end
-        end
-    end)
 
-    -- Single retry button with restored styling
-    local retryButton = Instance.new("TextButton")
-    retryButton.Size = UDim2.new(0.3, 0, 0.08, 0)
-    retryButton.Position = UDim2.new(0.35, 0, 0.9, 0)
-    retryButton.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
-    retryButton.Text = "Retry"
-    retryButton.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
-    retryButton.Font = Enum.Font.GothamBlack
-    retryButton.TextSize = 14
-    retryButton.Parent = MainFrame
-    retryButton.ZIndex = 2
-    
-    local retryCorner = Instance.new("UICorner")
-    retryCorner.CornerRadius = UDim.new(0.3, 0)
-    retryCorner.Parent = retryButton
-    
-    local retryStroke = Instance.new("UIStroke")
-    retryStroke.Color = Color3.fromRGB(255, 128, 0)  -- Restored orange color
-    retryStroke.Transparency = 0.7
-    retryStroke.Thickness = 1
-    retryStroke.Parent = retryButton
-    
-    retryButton.MouseButton1Click:Connect(function()
-        handleRetry()
-    end)
-
-    -- Create sliders with restored styling
+    -- Create Slider
     local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
-        local sliderContainer = Instance.new("Frame")
-        sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
-        sliderContainer.Position = position
-        sliderContainer.BackgroundTransparency = 1
-        sliderContainer.Parent = parent
-        
-        local titleLabel = Instance.new("TextLabel")
-        titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
-        titleLabel.BackgroundTransparency = 1
-        titleLabel.Text = title
-        titleLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
-        titleLabel.TextSize = 14
-        titleLabel.Font = Enum.Font.GothamBold
-        titleLabel.Parent = sliderContainer
-        
-        local sliderBar = Instance.new("TextButton")
-        sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
-        sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
-        sliderBar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)  -- Restored dark color
-        sliderBar.BorderSizePixel = 0
-        sliderBar.Text = ""
-        sliderBar.AutoButtonColor = false
-        sliderBar.Parent = sliderContainer
-        
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
-        fill.BackgroundColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
-        fill.BorderSizePixel = 0
-        fill.Parent = sliderBar
-        
-        local valueLabel = Instance.new("TextLabel")
-        valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
-        valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
-        valueLabel.BackgroundTransparency = 1
-        valueLabel.Text = tostring(defaultValue)
-        valueLabel.TextColor3 = Color3.fromRGB(255, 128, 0)  -- Restored orange color
-        valueLabel.TextSize = 14
-        valueLabel.Font = Enum.Font.GothamBold
-        valueLabel.Parent = sliderContainer
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0.5, 0)
-        corner.Parent = sliderBar
-        
-        local fillCorner = Instance.new("UICorner")
-        fillCorner.CornerRadius = UDim.new(0.5, 0)
-        fillCorner.Parent = fill
-        
-        -- [Rest of the slider functionality remains the same...]
-        local UserInputService = game:GetService("UserInputService")
-        local dragging = false
-        
-        local function updateValue(input)
-            local absolutePosition = input.Position
-            if UserInputService.TouchEnabled then
-                absolutePosition = Vector2.new(input.Position.X, input.Position.Y)
-            end
-            
-            local relativePos = (absolutePosition.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
-            relativePos = math.clamp(relativePos, 0, 1)
-            
-            local value = math.floor(min + ((max - min) * relativePos))
-            value = math.clamp(value, min, max)
-            
-            fill.Size = UDim2.new(relativePos, 0, 1, 0)
-            valueLabel.Text = tostring(value)
-            onValueChanged(value)
-        end
-        
-        sliderBar.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-               input.UserInputType == Enum.UserInputType.Touch then
-                dragging = true
-                updateValue(input)
-            end
-        end)
-        
-        sliderBar.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-               input.UserInputType == Enum.UserInputType.Touch then
-                dragging = false
-            end
-        end)
-        
-        sliderBar.InputChanged:Connect(function(input)
-            if dragging and 
-               (input.UserInputType == Enum.UserInputType.MouseMovement or 
-                input.UserInputType == Enum.UserInputType.Touch) then
-                updateValue(input)
-            end
-        end)
-        
-        return sliderContainer
-    end
-    
--- Create sliders with loaded settings
-    createSlider(
-        MainFrame, 
-        UDim2.new(0.1, 0, 0.65, 0),
-        "TP Delay", 
-        0, 
-        5, 
-        savedSettings["tpDelay"] or tpDelay,
-        function(value) 
-            tpDelay = value 
-            savedSettings["tpDelay"] = value
-            saveSettings(savedSettings)
-        end
-    )
-    
-    createSlider(
-        MainFrame, 
-        UDim2.new(0.1, 0, 0.8, 0),
-        "Enemy Range", 
-        1, 
-        20,
-        savedSettings["enemyRange"] or enemyRange,
-        function(value) 
-            enemyRange = value 
-            savedSettings["enemyRange"] = value
-            saveSettings(savedSettings)
-        end
-    )
+    local sliderContainer = Instance.new("Frame")
+    sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
+    sliderContainer.Position = position
+    sliderContainer.BackgroundTransparency = 1
+    sliderContainer.Parent = parent
 
-    -- Toggle GUI visibility when close button is clicked
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = title
+    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    titleLabel.TextSize = 14
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Parent = sliderContainer
+
+    local sliderBar = Instance.new("TextButton")  -- Changed to TextButton for better mobile support
+    sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
+    sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
+    sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    sliderBar.BorderSizePixel = 0
+    sliderBar.Text = ""  -- Empty text for the button
+    sliderBar.AutoButtonColor = false  -- Disable button color change
+    sliderBar.Parent = sliderContainer
+
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
+    fill.BorderSizePixel = 0
+    fill.Parent = sliderBar
+
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(defaultValue)
+    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    valueLabel.TextSize = 14
+    valueLabel.Font = Enum.Font.GothamBold
+    valueLabel.Parent = sliderContainer
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.5, 0)
+    corner.Parent = sliderBar
+
+    local fillCorner = Instance.new("UICorner")
+    fillCorner.CornerRadius = UDim.new(0.5, 0)
+    fillCorner.Parent = fill
+
+    local UserInputService = game:GetService("UserInputService")
+    local dragging = false
+
+    local function updateValue(input)
+        local absolutePosition = input.Position
+        if UserInputService.TouchEnabled then
+            -- Convert touch position to screen position
+            absolutePosition = Vector2.new(input.Position.X, input.Position.Y)
+        end
+        
+        local relativePos = (absolutePosition.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
+        relativePos = math.clamp(relativePos, 0, 1)
+        
+        local value = math.floor(min + ((max - min) * relativePos))
+        value = math.clamp(value, min, max)
+        
+        fill.Size = UDim2.new(relativePos, 0, 1, 0)
+        valueLabel.Text = tostring(value)
+        onValueChanged(value)
+    end
+
+    -- Handle both mouse and touch input
+    sliderBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            updateValue(input)
+        end
+    end)
+
+    sliderBar.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+           input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    sliderBar.InputChanged:Connect(function(input)
+        if dragging and 
+           (input.UserInputType == Enum.UserInputType.MouseMovement or 
+            input.UserInputType == Enum.UserInputType.Touch) then
+            updateValue(input)
+        end
+    end)
+
+    return sliderContainer
+end
+
+-- Update slider positions
+createSlider(
+    MainFrame, 
+    UDim2.new(0.1, 0, 0.7, 0),  -- Moved down
+    "Tween Speed", 
+    16, 
+    150, 
+    tweenSpeed, 
+    function(value) 
+        tweenSpeed = value 
+    end
+)
+
+createSlider(
+    MainFrame, 
+    UDim2.new(0.1, 0, 0.9, 0),  -- Moved down
+    "Enemy Range", 
+    1, 
+    15, 
+    enemyRange, 
+    function(value) 
+        enemyRange = value 
+    end
+)
+    
     CloseButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = not MainFrame.Visible
     end)
-
-    -- Return the created GUI
-    return {
-        ScreenGui = ScreenGui,
-        MainFrame = MainFrame,
-        CloseButton = CloseButton
-    }
+    
+    gui = ScreenGui
+    mainFrame = MainFrame
+    closeButton = CloseButton
+    
+    return ScreenGui, MainFrame, CloseButton
 end
 
 -- Initialize the GUI
-local guiElements = createGui()
-mainFrame = guiElements.MainFrame
-closeButton = guiElements.CloseButton
+createGui()
