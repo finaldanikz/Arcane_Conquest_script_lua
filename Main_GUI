@@ -9,8 +9,6 @@ local gui = nil
 local mainFrame = nil
 local closeButton = nil
 local saveFilePath = "settings.txt"
-local tweenSpeed = 16
-local enemyRange = 1
 
 -- Forward declare functions that are used before their definitions
 local createGui
@@ -168,171 +166,96 @@ local function toggleAutoAbility(isEnabled)
     end
 end
 
-local function findNearestEnemy()
-    local nearestEnemy = nil
+-- Mob Teleport functionality
+local function findNearestNPC()
+    local nearestNPC = nil
     local nearestDistance = math.huge
     
-    local character = game.Players.LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local Character = player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
     
-    local enemiesFolder = workspace:FindFirstChild("Enemies")
-    if not enemiesFolder then return end
+    local dungeon = workspace:FindFirstChild("enemies")
+    if not dungeon then return end
     
-    for _, enemy in ipairs(enemiesFolder:GetChildren()) do
-        if enemy:FindFirstChild("HumanoidRootPart") and 
-           enemy:FindFirstChild("Humanoid") and 
-           enemy.Humanoid.Health > 0 then
-            
-            local distance = (character.HumanoidRootPart.Position - enemy.HumanoidRootPart.Position).Magnitude
-            if distance < nearestDistance then
-                nearestDistance = distance
-                nearestEnemy = enemy
+    for _, child in ipairs(dungeon:GetChildren()) do
+        if child:FindFirstChild("enemiesFolder") then
+            for _, npc in ipairs(child.enemiesFolder:GetChildren()) do
+                if npc:FindFirstChild("HumanoidRootPart") and npc:FindFirstChild("Humanoid") and npc.Humanoid.Health > 0 then
+                    local distance = (Character.HumanoidRootPart.Position - npc.HumanoidRootPart.Position).Magnitude
+                    if distance < nearestDistance then
+                        nearestDistance = distance
+                        nearestNPC = npc
+                    end
+                end
             end
         end
     end
-    
-    return nearestEnemy
+    return nearestNPC
 end
 
--- Tween functionality
-local TweenService = game:GetService("TweenService")
-local mobTeleportActive = false
+local function softLockCharacter(character, position)
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local connection
+        connection = game:GetService("RunService").Heartbeat:Connect(function()
+            if character.Parent and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = position
+            else
+                connection:Disconnect()
+            end
+        end)
+        return connection
+    end
+end
+
+local softLockConnection
+local tpActive = false
+
+local function teleportToNPC()
+    if not tpActive then return end
+    
+    local Character = player.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then return end
+    
+    local npc = findNearestNPC()
+    if npc and npc:FindFirstChild("HumanoidRootPart") then
+        local npcPosition = npc.HumanoidRootPart.Position
+        local teleportPosition = Vector3.new(npcPosition.X, npcPosition.Y + 9, npcPosition.Z)
+        
+        local lookVector = (npcPosition - teleportPosition).Unit
+        local lookCFrame = CFrame.new(teleportPosition, teleportPosition + lookVector)
+        
+        Character.HumanoidRootPart.CFrame = lookCFrame
+        
+        if softLockConnection then
+            softLockConnection:Disconnect()
+        end
+        
+        softLockConnection = softLockCharacter(Character, lookCFrame)
+    end
+end
+
+-- Update the toggle function to use the new teleport system
 local teleportLoop = nil
 
-local function tweenToEnemy(character, enemy)
-    local tweenInfo = TweenInfo.new(
-        1/tweenSpeed, -- Convert speed to time (faster speed = shorter time)
-        Enum.EasingStyle.Linear,
-        Enum.EasingDirection.Out,
-        0,
-        false,
-        0
-    )
-    
-    local targetPos = enemy.HumanoidRootPart.Position + Vector3.new(0, enemyRange, 0)
-    
-    local tween = TweenService:Create(
-        character.HumanoidRootPart,
-        tweenInfo,
-        {CFrame = CFrame.new(targetPos, enemy.HumanoidRootPart.Position)}
-    )
-    
-    tween:Play()
-    return tween
-end
-
 local function toggleMobTeleport(isEnabled)
-    mobTeleportActive = isEnabled
+    tpActive = isEnabled
     
     if isEnabled then
         if not teleportLoop then
             teleportLoop = spawn(function()
-                while mobTeleportActive do
-                    pcall(function()
-                        local character = game.Players.LocalPlayer.Character
-                        if character and character:FindFirstChild("HumanoidRootPart") then
-                            local nearestEnemy = findNearestEnemy()
-                            if nearestEnemy and nearestEnemy:FindFirstChild("HumanoidRootPart") then
-                                -- Create and play tween
-                                local tween = tweenToEnemy(character, nearestEnemy)
-                                tween.Completed:Wait()
-                            end
-                        end
-                    end)
+                while tpActive do
+                    pcall(teleportToNPC)
                     task.wait(0.1)
                 end
             end)
         end
     else
-        mobTeleportActive = false
-        if teleportLoop then
-            teleportLoop = nil
+        if softLockConnection then
+            softLockConnection:Disconnect()
+            softLockConnection = nil
         end
+        teleportLoop = nil
     end
-end
-
-local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
-    local sliderContainer = Instance.new("Frame")
-    sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
-    sliderContainer.Position = position
-    sliderContainer.BackgroundTransparency = 1
-    sliderContainer.Parent = parent
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 14
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Parent = sliderContainer
-
-    local sliderBar = Instance.new("Frame")
-    sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
-    sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
-    sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    sliderBar.BorderSizePixel = 0
-    sliderBar.Parent = sliderContainer
-
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-    fill.BorderSizePixel = 0
-    fill.Parent = sliderBar
-
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
-    valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = tostring(defaultValue)
-    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    valueLabel.TextSize = 14
-    valueLabel.Font = Enum.Font.GothamBold
-    valueLabel.Parent = sliderContainer
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0.5, 0)
-    corner.Parent = sliderBar
-
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(0.5, 0)
-    fillCorner.Parent = fill
-
-    local dragging = false
-    
-    local function updateValue(input)
-        local pos = input.Position.X
-        local relativePos = (pos - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
-        relativePos = math.clamp(relativePos, 0, 1)
-        
-        local value = math.floor(min + ((max - min) * relativePos))
-        value = math.clamp(value, min, max)
-        
-        fill.Size = UDim2.new(relativePos, 0, 1, 0)
-        valueLabel.Text = tostring(value)
-        onValueChanged(value)
-    end
-
-    sliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            updateValue(input)
-        end
-    end)
-
-    sliderBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            updateValue(input)
-        end
-    end)
-
-    return sliderContainer
 end
 
 local function createGui()
@@ -347,11 +270,13 @@ local function createGui()
     local ButtonContainer = Instance.new("Frame")
     local HeaderLabel = Instance.new("TextLabel")
     
+    -- ScreenGui setup
     ScreenGui.Name = "PersistentGUI"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.DisplayOrder = 999999999
     ScreenGui.Parent = game.Players.LocalPlayer.PlayerGui
     
+    -- CloseButton setup
     CloseButton.Size = UDim2.new(0, 150, 0, 45)
     CloseButton.Position = UDim2.new(0.5, -75, 0, -40)
     CloseButton.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -363,17 +288,20 @@ local function createGui()
     CloseButton.Parent = ScreenGui
     CloseButton.ZIndex = 10
     
+    -- Add corner to close button
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0.3, 0)
     closeCorner.Parent = CloseButton
     
+    -- Add stroke to close button
     local closeStroke = Instance.new("UIStroke")
     closeStroke.Color = Color3.fromRGB(255, 255, 255)
     closeStroke.Transparency = 0.8
     closeStroke.Thickness = 1
     closeStroke.Parent = CloseButton
     
-    MainFrame.Size = UDim2.new(0.25, 0, 0.7, 0)
+    -- MainFrame setup
+    MainFrame.Size = UDim2.new(0.25, 0, 0.6, 0)
     MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -384,12 +312,14 @@ local function createGui()
     MainFrame.ZIndex = 1
     MainFrame.Parent = ScreenGui
     
+    -- Add border to MainFrame
     local mainFrameStroke = Instance.new("UIStroke")
     mainFrameStroke.Color = Color3.fromRGB(86, 71, 201)
     mainFrameStroke.Thickness = 2
     mainFrameStroke.Parent = MainFrame
     
-   ImageLabel.Size = UDim2.new(1, 0, 0.6, 0)
+    -- Image setup
+    ImageLabel.Size = UDim2.new(1, 0, 0.6, 0)
     ImageLabel.Position = UDim2.new(0, 0, 0, 0)
     ImageLabel.BackgroundTransparency = 1
     ImageLabel.Image = "rbxassetid://83971645462159"
@@ -397,6 +327,7 @@ local function createGui()
     ImageLabel.ZIndex = 2
     ImageLabel.Parent = MainFrame
     
+    -- Header setup
     HeaderLabel.Size = UDim2.new(1, 0, 0.1, 0)
     HeaderLabel.Position = UDim2.new(0, 0, 0, 0)
     HeaderLabel.BackgroundTransparency = 1
@@ -407,8 +338,9 @@ local function createGui()
     HeaderLabel.ZIndex = 3
     HeaderLabel.Parent = MainFrame
     
-    ButtonContainer.Size = UDim2.new(0.8, 0, 0.2, 0) 
-    ButtonContainer.Position = UDim2.new(0.5, 0, 0.45, 0)  
+    -- Button Container setup
+    ButtonContainer.Size = UDim2.new(0.8, 0, 0.45, 0)
+    ButtonContainer.Position = UDim2.new(0.5, 0, 0.75, 0)
     ButtonContainer.AnchorPoint = Vector2.new(0.5, 0.5)
     ButtonContainer.BackgroundTransparency = 1
     ButtonContainer.Parent = MainFrame
@@ -417,16 +349,17 @@ local function createGui()
     mainFrameCorner.CornerRadius = UDim.new(0.05, 0)
     mainFrameCorner.Parent = MainFrame
     
+    -- Grid layout for buttons
     local UIGridLayout = Instance.new("UIGridLayout")
     UIGridLayout.Parent = ButtonContainer
-    UIGridLayout.CellSize = UDim2.new(0.45, 0, 0.8, 0)  -- Make cells smaller and fit two per row
-    UIGridLayout.CellPadding = UDim2.new(0.05, 0, 0.1, 0)
+    UIGridLayout.CellSize = UDim2.new(0.8, 0, 0.25, 0)  -- Adjusted for three buttons
+    UIGridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
     UIGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIGridLayout.FillDirection = Enum.FillDirection.Horizontal
+    UIGridLayout.FillDirectionMaxCells = 1
     UIGridLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
     UIGridLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-
     
+    -- Make frames draggable
     makeDraggable(CloseButton)
     makeDraggable(MainFrame)
     
@@ -445,10 +378,12 @@ local function createGui()
         button.Parent = ButtonContainer
         button.ZIndex = 2
         
+        -- Add rounder corners to button
         local corner = Instance.new("UICorner")
         corner.CornerRadius = UDim.new(0.3, 0)
         corner.Parent = button
         
+        -- Add stroke to button
         local stroke = Instance.new("UIStroke")
         stroke.Color = Color3.fromRGB(255, 255, 255)
         stroke.Transparency = 0.9
@@ -488,129 +423,6 @@ local function createGui()
     createToggleButton(1, "Auto Hit", toggleAutoHit)
     createToggleButton(2, "Auto Ability", toggleAutoAbility)
     createToggleButton(3, "Mob Teleport", toggleMobTeleport)
-
-    -- Create Slider
-    local function createSlider(parent, position, title, min, max, defaultValue, onValueChanged)
-    local sliderContainer = Instance.new("Frame")
-    sliderContainer.Size = UDim2.new(0.8, 0, 0.15, 0)
-    sliderContainer.Position = position
-    sliderContainer.BackgroundTransparency = 1
-    sliderContainer.Parent = parent
-
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0.4, 0)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = title
-    titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    titleLabel.TextSize = 14
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.Parent = sliderContainer
-
-    local sliderBar = Instance.new("TextButton")  -- Changed to TextButton for better mobile support
-    sliderBar.Size = UDim2.new(1, 0, 0.2, 0)
-    sliderBar.Position = UDim2.new(0, 0, 0.5, 0)
-    sliderBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    sliderBar.BorderSizePixel = 0
-    sliderBar.Text = ""  -- Empty text for the button
-    sliderBar.AutoButtonColor = false  -- Disable button color change
-    sliderBar.Parent = sliderContainer
-
-    local fill = Instance.new("Frame")
-    fill.Size = UDim2.new(defaultValue/(max-min), 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(86, 71, 201)
-    fill.BorderSizePixel = 0
-    fill.Parent = sliderBar
-
-    local valueLabel = Instance.new("TextLabel")
-    valueLabel.Size = UDim2.new(1, 0, 0.4, 0)
-    valueLabel.Position = UDim2.new(0, 0, 0.8, 0)
-    valueLabel.BackgroundTransparency = 1
-    valueLabel.Text = tostring(defaultValue)
-    valueLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    valueLabel.TextSize = 14
-    valueLabel.Font = Enum.Font.GothamBold
-    valueLabel.Parent = sliderContainer
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0.5, 0)
-    corner.Parent = sliderBar
-
-    local fillCorner = Instance.new("UICorner")
-    fillCorner.CornerRadius = UDim.new(0.5, 0)
-    fillCorner.Parent = fill
-
-    local UserInputService = game:GetService("UserInputService")
-    local dragging = false
-
-    local function updateValue(input)
-        local absolutePosition = input.Position
-        if UserInputService.TouchEnabled then
-            -- Convert touch position to screen position
-            absolutePosition = Vector2.new(input.Position.X, input.Position.Y)
-        end
-        
-        local relativePos = (absolutePosition.X - sliderBar.AbsolutePosition.X) / sliderBar.AbsoluteSize.X
-        relativePos = math.clamp(relativePos, 0, 1)
-        
-        local value = math.floor(min + ((max - min) * relativePos))
-        value = math.clamp(value, min, max)
-        
-        fill.Size = UDim2.new(relativePos, 0, 1, 0)
-        valueLabel.Text = tostring(value)
-        onValueChanged(value)
-    end
-
-    -- Handle both mouse and touch input
-    sliderBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            updateValue(input)
-        end
-    end)
-
-    sliderBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-           input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-
-    sliderBar.InputChanged:Connect(function(input)
-        if dragging and 
-           (input.UserInputType == Enum.UserInputType.MouseMovement or 
-            input.UserInputType == Enum.UserInputType.Touch) then
-            updateValue(input)
-        end
-    end)
-
-    return sliderContainer
-end
-
--- Update slider positions
-createSlider(
-    MainFrame, 
-    UDim2.new(0.1, 0, 0.7, 0),  -- Moved down
-    "Tween Speed", 
-    16, 
-    150, 
-    tweenSpeed, 
-    function(value) 
-        tweenSpeed = value 
-    end
-)
-
-createSlider(
-    MainFrame, 
-    UDim2.new(0.1, 0, 0.9, 0),  -- Moved down
-    "Enemy Range", 
-    1, 
-    15, 
-    enemyRange, 
-    function(value) 
-        enemyRange = value 
-    end
-)
     
     CloseButton.MouseButton1Click:Connect(function()
         MainFrame.Visible = not MainFrame.Visible
